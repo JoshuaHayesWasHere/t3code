@@ -292,6 +292,7 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { HeroWidgets } from "./chat/heroWidgets/HeroWidgets";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -1694,6 +1695,7 @@ export default function ChatView(props: ChatViewProps) {
     backgroundSubmissionPending,
     hasWorktreeSetupCard: worktreeSetup !== null,
   });
+  const showDraftHeroWidgets = isDraftHeroState && !isMobileViewport;
   const {
     transitionGroupRef: draftHeroTransitionGroupRef,
     composerAnchorRef: draftHeroComposerAnchorRef,
@@ -3760,7 +3762,10 @@ export default function ChatView(props: ChatViewProps) {
                 <div
                   data-chat-composer-stack="true"
                   data-sidebar-slide-track="center"
-                  className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-(--chat-content-max-width)"
+                  className={cn(
+                    "group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-(--chat-content-max-width)",
+                    showDraftHeroWidgets && "mb-(--hero-widgets-below)",
+                  )}
                 >
                   <div
                     ref={draftHeroComposerAnchorRef}
@@ -4060,6 +4065,7 @@ export default function ChatView(props: ChatViewProps) {
                       className="h-[calc(env(safe-area-inset-bottom)+1rem)] sm:h-[calc(env(safe-area-inset-bottom)+1.125rem)]"
                     />
                   </div>
+                  {showDraftHeroWidgets ? <HeroWidgets /> : null}
                 </div>
               </div>
             </div>
