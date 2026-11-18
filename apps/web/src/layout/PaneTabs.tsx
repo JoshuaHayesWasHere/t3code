@@ -417,8 +417,12 @@ function markJoinedLabel(entry: PaneStrip): void {
 
 function stripBoxOf(strip: HTMLElement, tab: HTMLElement): { x: number; w: number } | null {
   const bounds = strip.getBoundingClientRect();
-  // Layout pixels, also while the overview scales the pane.
-  const scale = strip.offsetWidth > 0 ? bounds.width / strip.offsetWidth : 1;
+  // Layout pixels, also while the overview scales the pane. offsetWidth is rounded to a whole
+  // pixel, so a gap under 1px is that rounding, not a scale.
+  const scale =
+    strip.offsetWidth > 0 && Math.abs(bounds.width - strip.offsetWidth) >= 1
+      ? bounds.width / strip.offsetWidth
+      : 1;
   if (scale <= 0) return null;
   const rect = tab.getBoundingClientRect();
   return {
@@ -697,6 +701,7 @@ export function usePaneSiblingTabs(
   const pane = useLayoutStore((state) =>
     paneId === null ? null : (findLayoutPane(state.layout, paneId)?.pane ?? null),
   );
+  const resolve = useMessages();
   const workingGroup = useClientSettings((settings) => settings.paneTabsWorkingGroup);
   const hideSettled = useClientSettings((settings) => settings.paneTabsFollowInbox);
   const threadKeys = (workingGroup || hideSettled) && pane ? paneStripThreadKeys(pane) : [];
@@ -708,7 +713,7 @@ export function usePaneSiblingTabs(
     arrangePaneStrip({
       tabs: omitTabId === undefined ? pane.tabs : pane.tabs.filter((tab) => tab.id !== omitTabId),
       activeTabId: tabId,
-      groups: paneStripGroups(pane, workingGroup),
+      groups: paneStripGroups(pane, workingGroup, resolve),
       threadStateOf: paneStripThreadStateOf(threadKeys, threadStates),
       hideSettled,
     }),
@@ -772,20 +777,30 @@ type TabGroupMenuId =
   | "group:turn-off";
 
 function tabGroupMenuItems(group: PaneTabGroupDefinition): ContextMenuItem<TabGroupMenuId>[] {
-  if (group.rule !== null) return [{ id: "group:turn-off", label: "Turn off the Working group" }];
+  if (group.rule !== null) {
+    return [{ id: "group:turn-off", label: m(msg("Turn off the Working group")) }];
+  }
   return [
-    { id: "group:rename", label: "Rename", icon: "pencil" },
+    {
+      id: "group:rename",
+      label: m(msg("Rename", { $context: "verb, renames a tab group" })),
+      icon: "pencil",
+    },
     {
       id: "group:color",
-      label: "Color",
+      label: m(msg("Color", { $context: "noun, a tab group color" })),
       children: LAYOUT_TAB_GROUP_COLORS.map((color) => ({
         id: `group:color:${color}` as const,
-        label: TAB_GROUP_COLOR_LABEL[color],
+        label: m(TAB_GROUP_COLOR_LABEL[color]),
         checked: color === group.color,
       })),
     },
-    { id: "group:ungroup", label: "Ungroup", separatorBefore: true },
-    { id: "group:close", label: "Close group", icon: "x", destructive: true },
+    {
+      id: "group:ungroup",
+      label: m(msg("Ungroup", { $context: "verb, ungroups a tab group" })),
+      separatorBefore: true,
+    },
+    { id: "group:close", label: m(msg("Close group")), icon: "x", destructive: true },
   ];
 }
 
@@ -804,8 +819,8 @@ async function showTabGroupMenu(
   }
   if (action === "group:rename") {
     const draft = await requestTabGroupEditor({
-      heading: "Edit group",
-      action: "Save",
+      heading: msg("Edit group"),
+      action: msg("Save", { $context: "verb, saves a tab group" }),
       initial: { title: group.title, color: group.color },
     });
     if (draft) store.updateTabGroup(group.id, draft);
@@ -824,8 +839,9 @@ async function showTabGroupMenu(
 }
 
 function PaneTabGroupChip({ group, count }: { group: PaneTabGroupDefinition; count: number }) {
+  const gt = useGT();
   const { paneId } = useLayoutPane();
-  const name = group.title || "Unnamed group";
+  const name = group.title || gt("Unnamed group");
   const toggle = () => {
     const store = useLayoutStore.getState();
     if (group.rule === null) store.updateTabGroup(group.id, { collapsed: !group.collapsed });
@@ -840,7 +856,10 @@ function PaneTabGroupChip({ group, count }: { group: PaneTabGroupDefinition; cou
             type="button"
             data-tab-group-chip={group.id}
             aria-expanded={!group.collapsed}
-            aria-label={`${name}, ${count} ${count === 1 ? "tab" : "tabs"}`}
+            aria-label={gt(
+              "{count, plural, one {{name}, {count} tab} other {{name}, {count} tabs}}",
+              { name, count },
+            )}
             onClick={toggle}
             onContextMenu={(event) => {
               event.preventDefault();
@@ -855,7 +874,7 @@ function PaneTabGroupChip({ group, count }: { group: PaneTabGroupDefinition; cou
         {group.collapsed ? <span className="tabular-nums">{count}</span> : null}
       </TooltipTrigger>
       <TooltipPopup side="bottom">
-        {group.collapsed ? `Show ${name}` : `Collapse ${name}`}
+        {group.collapsed ? gt("Show {name}", { name }) : gt("Collapse {name}", { name })}
       </TooltipPopup>
     </Tooltip>
   );
@@ -932,7 +951,7 @@ export function buildLayoutTabMenuItems(
   }
   items.push({
     id: "layout:group-new",
-    label: "Add tab to new group",
+    label: m(msg("Add tab to new group")),
     icon: "folder-plus",
     separatorBefore: true,
   });
@@ -940,16 +959,16 @@ export function buildLayoutTabMenuItems(
   if (otherGroups.length > 0) {
     items.push({
       id: "layout:group-add",
-      label: "Add tab to group",
+      label: m(msg("Add tab to group")),
       icon: "folder",
       children: otherGroups.map((group) => ({
         id: `layout:group-add:${group.id}` as const,
-        label: group.title || "Unnamed group",
+        label: group.title || m(msg("Unnamed group")),
       })),
     });
   }
   if (location.tab.groupId !== undefined) {
-    items.push({ id: "layout:group-remove", label: "Remove from group" });
+    items.push({ id: "layout:group-remove", label: m(msg("Remove from group")) });
   }
   if (location.tab.content.kind === "chat" && location.tab.content.target.kind === "server") {
     items.push({
@@ -1029,8 +1048,8 @@ export function runLayoutTabMenuAction(action: LayoutTabMenuId, tabId: string): 
       return;
     case "layout:group-new":
       void requestTabGroupEditor({
-        heading: "New tab group",
-        action: "Create",
+        heading: msg("New tab group"),
+        action: msg("Create", { $context: "verb, creates a tab group" }),
         initial: { title: "", color: nextLayoutTabGroupColor(location.pane) },
       }).then((draft) => {
         if (draft) useLayoutStore.getState().createTabGroup(tabId, draft);
@@ -1374,9 +1393,9 @@ function ThreadLayoutPaneTab({
 
 /** The sidebar's dot for a thread that needs you, as a closed folder draws it. */
 const NEEDS_YOU_DOT = {
-  attention: { tone: "warning", label: "Needs you" },
-  failed: { tone: "danger", label: "Failed" },
-  unread: { tone: "success", label: "Done" },
+  attention: { tone: "warning", label: msg("Needs you", { $context: "thread status" }) },
+  failed: { tone: "danger", label: msg("Failed", { $context: "thread status" }) },
+  unread: { tone: "success", label: msg("Done", { $context: "thread status" }) },
 } as const satisfies Record<string, { tone: StatusDotTone; label: string }>;
 
 function LayoutPaneTabButton({
@@ -1390,6 +1409,7 @@ function LayoutPaneTabButton({
   onOpenMenu: (position: { x: number; y: number }) => void;
   status?: { tone: StatusDotTone; label: string } | null;
 } & PaneTabGroupProps) {
+  const resolve = useMessages();
   const label = useLayoutTabLabel(tab);
   const focusTab = () => {
     useLayoutStore.getState().focusTab(tab.id);
@@ -1439,12 +1459,12 @@ function LayoutPaneTabButton({
           {status ? (
             <>
               <StatusDot tone={status.tone} />
-              <span className="sr-only">, {status.label}</span>
+              <span className="sr-only">, {resolve(status.label)}</span>
             </>
           ) : null}
         </TooltipTrigger>
         <TooltipPopup side="bottom" className="whitespace-pre-line">
-          {status ? `${label.tooltip}\n${status.label}` : label.tooltip}
+          {status ? `${label.tooltip}\n${resolve(status.label)}` : label.tooltip}
         </TooltipPopup>
       </Tooltip>
       <LayoutTabCloseButton tabId={tab.id} title={label.title} />
