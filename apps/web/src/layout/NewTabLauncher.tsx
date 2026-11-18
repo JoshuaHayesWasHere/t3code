@@ -64,7 +64,8 @@ import { runInNewLayoutTab, useLayoutStore } from "./layoutStore";
 import {
   LAYOUT_TAB_ICON_CLASS,
   LAYOUT_TAB_SLOT_CLASS,
-  LayoutPaneTab,
+  PaneStripItems,
+  PaneTabGroupLine,
   LayoutPaneTabStrip,
   LayoutNewTabButton,
   LayoutTabCloseButton,
@@ -463,9 +464,7 @@ function LauncherTabNotch({ tabId }: { tabId: string | null }) {
   return (
     <PaneNotch>
       <LayoutPaneTabStrip>
-        {siblingTabs.before.map((tab) => (
-          <LayoutPaneTab key={tab.id} tab={tab} />
-        ))}
+        <PaneStripItems items={siblingTabs.before} />
         <span className={LAYOUT_TAB_SLOT_CLASS}>
           <div
             className={PANE_TAB_CLASS}
@@ -486,10 +485,9 @@ function LauncherTabNotch({ tabId }: { tabId: string | null }) {
           {closable && tabId !== null ? (
             <LayoutTabCloseButton tabId={tabId} title={gt("New tab")} />
           ) : null}
+          <PaneTabGroupLine color={siblingTabs.activeColor} />
         </span>
-        {siblingTabs.after.map((tab) => (
-          <LayoutPaneTab key={tab.id} tab={tab} />
-        ))}
+        <PaneStripItems items={siblingTabs.after} />
       </LayoutPaneTabStrip>
       <LayoutNewTabButton tabId={tabId} />
     </PaneNotch>
