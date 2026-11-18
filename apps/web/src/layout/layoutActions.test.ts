@@ -24,6 +24,7 @@ import { useClosedViewStore } from "../closedViewStore";
 import { planNextReopen, reopenClosedView } from "../reopenClosedView";
 import {
   closeLayoutTabByUser,
+  closeLayoutTabGroupByUser,
   closeOtherLayoutTabsByUser,
   openLayoutNewThreadTab,
 } from "./layoutActions";
@@ -101,6 +102,29 @@ describe("closeLayoutTabByUser", () => {
     using layout = setup([other, subagent]);
     closeOtherLayoutTabsByUser(layout.tabOf(other)!.id);
     expect(layout.chats()).toEqual([other]);
+  });
+
+  it("closes a group's tabs as user closes, so each can reopen, moving focus once", () => {
+    const third: LayoutTabContent = {
+      kind: "chat",
+      target: { kind: "server", threadRef: scopeThreadRef(environmentId, ThreadId.make("third")) },
+    };
+    using layout = setup([parent, other, third]);
+    const store = useLayoutStore.getState();
+    store.createTabGroup(layout.tabOf(parent)!.id, { title: "g", color: "red" });
+    const groupId = layout.tabOf(parent)!.groupId!;
+    store.addTabToGroup(layout.tabOf(other)!.id, groupId);
+    store.focusTab(layout.tabOf(parent)!.id);
+    const remembered = useClosedViewStore.getState().entries.length;
+    const focused: unknown[] = [];
+    const unsubscribe = useLayoutStore.subscribe((state) =>
+      focused.push(selectFocusedTab(state.layout)?.content),
+    );
+    closeLayoutTabGroupByUser(groupId);
+    unsubscribe();
+    expect(layout.chats()).toEqual([third]);
+    expect(useClosedViewStore.getState().entries.length - remembered).toBe(2);
+    expect([...new Set(focused)]).toEqual([parent, third]);
   });
 
   it.each([{ contents: [subagent, other] }, { contents: [parent, subagent, other] }])(
