@@ -383,6 +383,7 @@ export const ChatHeader = memo(function ChatHeader({
                     isServerThread ? (
                       <PaneTabButton
                         data-layout-pane-tab={layoutTabId ?? undefined}
+                        data-tab-group={siblingTabs.activeGroupId ?? undefined}
                         type="button"
                         aria-label={`Thread actions for ${activeThreadTitle}`}
                         aria-haspopup="menu"
@@ -395,6 +396,7 @@ export const ChatHeader = memo(function ChatHeader({
                       <div
                         className={PANE_TAB_CLASS}
                         data-layout-pane-tab={layoutTabId ?? undefined}
+                        data-tab-group={siblingTabs.activeGroupId ?? undefined}
                         onAuxClick={handleTabAuxClick}
                         onPointerDown={handleTabPointerDown}
                       />
