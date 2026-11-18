@@ -11,8 +11,8 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-const CPU_HISTORY_INTERVAL_MS = 5_000;
-const CPU_HISTORY_SAMPLES = 60;
+const CPU_HISTORY_INTERVAL_MS = 15_000;
+const CPU_HISTORY_SAMPLES = (60 * 60_000) / CPU_HISTORY_INTERVAL_MS;
 
 export class HostResources extends Context.Service<
   HostResources,

@@ -117,12 +117,12 @@ describe("HostResources.layer", () => {
   it.effect("serves the CPU history it samples in the background", () =>
     Effect.gen(function* () {
       setup(0.5);
-      yield* TestClock.adjust("20 seconds");
+      yield* TestClock.adjust("60 seconds");
       const snapshot = yield* read;
 
       assert.deepStrictEqual(snapshot.cpuHistory, {
-        endAt: 20_000,
-        intervalMs: 5_000,
+        endAt: 60_000,
+        intervalMs: 15_000,
         values: [0.5, 0.5, 0.5],
       });
     }).pipe(Effect.provide(linuxHost(unlimitedCgroup))),
