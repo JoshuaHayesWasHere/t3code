@@ -89,7 +89,7 @@ export function LayoutOnboarding() {
   const steps = [
     {
       title: "New tab",
-      text: "Opens a new chat, terminal, browser or files in this pane.",
+      text: "Opens a new chat in this pane.",
       selector: '[data-layout-pane-focused="true"] [aria-label^="New tab"]',
       Icon: PlusIcon,
     },

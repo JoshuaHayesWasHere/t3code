@@ -43,6 +43,7 @@ import {
 import { previewRuntimeTabId } from "../browser/previewRuntimeTabId";
 import { canShareWithGuestAtom } from "../components/chat/guestShareAvailability";
 import { previewBridge } from "../components/preview/previewBridge";
+import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useThreadActionMenu } from "../hooks/useThreadActionMenu";
 
 import { ProjectFavicon } from "../components/ProjectFavicon";
@@ -86,7 +87,7 @@ import {
   closeLayoutTabByUser,
   closeOtherLayoutTabsByUser,
   createLayoutNewTabContent,
-  openLayoutNewTab,
+  openLayoutNewThreadTab,
   splitLayoutTab,
 } from "./layoutActions";
 import { beginLayoutContentDrag, beginLayoutTabDrag } from "./layoutDrag";
@@ -995,6 +996,7 @@ export function LayoutTabCloseButton({ tabId, title }: { tabId: string; title: s
 export function LayoutNewTabButton({ tabId }: { tabId: string | null }) {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const shortcut = shortcutLabelForCommand(keybindings, "tab.new");
+  const handleNewThread = useNewThreadHandler();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -1012,7 +1014,7 @@ export function LayoutNewTabButton({ tabId }: { tabId: string | null }) {
             }
             onClick={() => {
               if (tabId !== null) useLayoutStore.getState().focusTab(tabId);
-              openLayoutNewTab();
+              void openLayoutNewThreadTab(handleNewThread);
             }}
           />
         }
