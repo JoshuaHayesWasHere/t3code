@@ -43,12 +43,15 @@ export function isProviderSkillUserInvocable(
   return skill.enabled && skill.userInvocable !== false;
 }
 
-function skillGroupTier(skill: ServerProviderSkill): number {
+function skillGroupTier(skill: Pick<ServerProviderSkill, "group" | "groupOrder">): number {
   if (skill.groupOrder !== undefined) return 0;
   return skill.group ? 1 : 2;
 }
 
-function compareSkillGroups(left: ServerProviderSkill, right: ServerProviderSkill): number {
+export function compareSkillGroups(
+  left: Pick<ServerProviderSkill, "group" | "groupOrder">,
+  right: Pick<ServerProviderSkill, "group" | "groupOrder">,
+): number {
   return (
     skillGroupTier(left) - skillGroupTier(right) ||
     (left.groupOrder ?? 0) - (right.groupOrder ?? 0) ||
