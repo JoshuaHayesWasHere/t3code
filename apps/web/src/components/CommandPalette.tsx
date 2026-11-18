@@ -1747,7 +1747,7 @@ function OpenCommandPaletteDialog(props: {
   ) {
     actionItems.push(
       ...buildLayoutPaletteItems(scrollingWorkspaces, messages),
-      ...buildTabGroupPaletteItems(),
+      ...buildTabGroupPaletteItems(messages),
     );
   }
 
