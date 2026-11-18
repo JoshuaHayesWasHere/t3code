@@ -1,4 +1,4 @@
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProviderDriverKind, ThreadId } from "@t3tools/contracts";
 import { retainPendingComposerMenuItems } from "./composerMenuResults";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -57,6 +57,37 @@ describe("groupComposerCommandItems", () => {
     expect(groupComposerCommandItems([thread, path], "path").map((group) => group.key)).toEqual([
       "threads",
       "paths",
+    ]);
+  });
+
+  it("gives each slash menu skill group its own heading", () => {
+    const skill = (name: string, group?: string) =>
+      ({
+        id: `skill:claude:${name}`,
+        type: "skill",
+        provider: ProviderDriverKind.make("claude"),
+        skill: {
+          name,
+          path: `/skills/${name}/SKILL.md`,
+          enabled: true,
+          ...(group ? { group } : {}),
+        },
+        label: `/skill:${name}`,
+        description: "",
+      }) satisfies ComposerCommandItem;
+    const groups = groupComposerCommandItems(
+      [
+        skill("how", "Understand"),
+        skill("why", "Understand"),
+        skill("file-pr", "Ship"),
+        skill("x"),
+      ],
+      "slash-command",
+    );
+    expect(groups.map((group) => [group.label, group.items.length])).toEqual([
+      ["Understand", 2],
+      ["Ship", 1],
+      ["Skills", 1],
     ]);
   });
 });

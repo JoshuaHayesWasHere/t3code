@@ -142,7 +142,12 @@ function composerCommandItemGroup(
     case "provider-slash-command":
       return { key: `provider:${item.provider}`, label: providerLabel(item.provider) };
     case "skill": {
-      if (triggerKind === "slash-command") return { key: "skills", label: "Skills" };
+      if (triggerKind === "slash-command") {
+        const group = item.skill.group;
+        return group
+          ? { key: `skills:group:${group}`, label: group }
+          : { key: "skills", label: "Skills" };
+      }
       // `$` groups skills by where they come from, which replaces the per-row source badge.
       const source = resolveProviderSkillSourceKind(item.skill);
       if (source === "personal") return { key: "skills:personal", label: "Personal" };

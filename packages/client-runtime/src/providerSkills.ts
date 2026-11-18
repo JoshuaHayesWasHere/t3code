@@ -43,12 +43,27 @@ export function isProviderSkillUserInvocable(
   return skill.enabled && skill.userInvocable !== false;
 }
 
+function skillGroupTier(skill: ServerProviderSkill): number {
+  if (skill.groupOrder !== undefined) return 0;
+  return skill.group ? 1 : 2;
+}
+
+function compareSkillGroups(left: ServerProviderSkill, right: ServerProviderSkill): number {
+  return (
+    skillGroupTier(left) - skillGroupTier(right) ||
+    (left.groupOrder ?? 0) - (right.groupOrder ?? 0) ||
+    (left.group ?? "").localeCompare(right.group ?? "")
+  );
+}
+
 export function getProviderSkillsForSlashMenu(
   skills: ReadonlyArray<ServerProviderSkill>,
   showSkillsInSlashMenu: boolean,
 ): ServerProviderSkill[] {
   return showSkillsInSlashMenu
-    ? dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable))
+    ? dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable)).sort(
+        compareSkillGroups,
+      )
     : [];
 }
 
