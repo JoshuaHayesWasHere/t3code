@@ -49,7 +49,6 @@ import { useLayoutPane } from "../../layout/layoutPaneContext";
 import {
   LAYOUT_TAB_ICON_CLASS,
   LAYOUT_TAB_SLOT_CLASS,
-  LayoutPaneTab,
   LayoutNewTabButton,
   LayoutPaneTabStrip,
   LayoutTabCloseButton,
@@ -58,6 +57,9 @@ import {
   ghostTabTooltip,
   finishLayoutTabRename,
   isLayoutTabMenuId,
+  PaneStripItems,
+  PaneTabGroupLine,
+  paneStripItemTabs,
   runLayoutTabMenuAction,
   useLayoutPaneSiblingTabs,
   useLayoutTabGhostOf,
@@ -316,7 +318,7 @@ export const ChatHeader = memo(function ChatHeader({
   // The parent's own tab already leads this one in the strip.
   const parentTabShown =
     parentThreadLink !== null &&
-    siblingTabs.before.some(
+    paneStripItemTabs(siblingTabs.before).some(
       (tab) =>
         tab.content.kind === "chat" &&
         tab.content.target.kind === "server" &&
@@ -333,9 +335,7 @@ export const ChatHeader = memo(function ChatHeader({
     >
       <PaneNotch>
         <LayoutPaneTabStrip>
-          {siblingTabs.before.map((tab) => (
-            <LayoutPaneTab key={tab.id} tab={tab} />
-          ))}
+          <PaneStripItems items={siblingTabs.before} />
           {parentThreadLink && !parentTabShown ? (
             <ParentThreadTab
               environmentId={activeThreadEnvironmentId}
@@ -383,6 +383,7 @@ export const ChatHeader = memo(function ChatHeader({
                     isServerThread ? (
                       <PaneTabButton
                         data-layout-pane-tab={layoutTabId ?? undefined}
+                        data-tab-group={siblingTabs.activeGroupId ?? undefined}
                         type="button"
                         aria-label={`Thread actions for ${activeThreadTitle}`}
                         aria-haspopup="menu"
@@ -395,6 +396,7 @@ export const ChatHeader = memo(function ChatHeader({
                       <div
                         className={PANE_TAB_CLASS}
                         data-layout-pane-tab={layoutTabId ?? undefined}
+                        data-tab-group={siblingTabs.activeGroupId ?? undefined}
                         onAuxClick={handleTabAuxClick}
                         onPointerDown={handleTabPointerDown}
                       />
@@ -420,11 +422,10 @@ export const ChatHeader = memo(function ChatHeader({
               {layoutTabId !== null ? (
                 <LayoutTabCloseButton tabId={layoutTabId} title={activeThreadTitle} />
               ) : null}
+              <PaneTabGroupLine color={siblingTabs.activeColor} />
             </span>
           )}
-          {siblingTabs.after.map((tab) => (
-            <LayoutPaneTab key={tab.id} tab={tab} />
-          ))}
+          <PaneStripItems items={siblingTabs.after} />
           {hiddenTerminal ? (
             // The hidden terminal keeps a tab like any other pane tab.
             <span className={LAYOUT_TAB_SLOT_CLASS}>

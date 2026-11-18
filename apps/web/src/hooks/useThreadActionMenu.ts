@@ -162,7 +162,9 @@ export function useThreadActionMenu(input: {
         canTurnIntoProject: canTurnThreadIntoProject(threadRef),
       });
       const leading = leadingItems?.() ?? [];
-      const leadingIds = new Set(leading.map((item) => item.id));
+      const leadingIds = new Set(
+        leading.flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]),
+      );
       const sideChatItems: ContextMenuItem<string>[] = onNewSideChat
         ? [{ id: NEW_SIDE_CHAT_MENU_ID, label: "New side chat", icon: "messages-square" }]
         : [];

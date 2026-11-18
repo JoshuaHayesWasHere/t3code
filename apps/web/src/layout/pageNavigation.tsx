@@ -15,12 +15,16 @@ import {
 import { useLayoutStore } from "./layoutStore";
 import { readPullRequestListPreferences } from "../components/pullRequest/pullRequestListPreferences";
 
+export function isLayoutRoutePath(pathname: string): boolean {
+  return pathname === "/pull-requests";
+}
+
 /** The page tab a URL shows in the layout. Settings and Usage open as modals over it instead. */
 export function layoutRoutePage(location: {
   pathname: string;
   href: string;
 }): LayoutPageContent | null {
-  return location.pathname === "/pull-requests"
+  return isLayoutRoutePath(location.pathname)
     ? { kind: "pull-requests", href: location.href }
     : null;
 }
