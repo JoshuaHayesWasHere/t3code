@@ -35,6 +35,7 @@ import {
   closeLayoutTabByUser,
   focusAdjacentLayoutTab,
   openLayoutNewTab,
+  openLayoutNewThreadTab,
   toggleFocusedLayoutFill,
 } from "../layout/layoutActions";
 import { useLayoutStore } from "../layout/layoutStore";
@@ -161,7 +162,7 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
   const unregisterCommands = registerCommands(
     {
       "chat.newLocal": startNewLocal,
-      "tab.new": layoutCommand(() => openLayoutNewTab()),
+      "tab.new": layoutCommand(() => void openLayoutNewThreadTab(handleNewThread)),
       "tab.next": layoutCommand(() => focusAdjacentLayoutTab(1), true),
       "tab.previous": layoutCommand(() => focusAdjacentLayoutTab(-1), true),
       "layout.splitRight": layoutCommand(() => openLayoutNewTab("new-column")),
