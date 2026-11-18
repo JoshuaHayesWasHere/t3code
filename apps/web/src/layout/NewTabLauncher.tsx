@@ -28,7 +28,9 @@ import {
   COLLAPSED_SIDEBAR_INSET_EASE_CLASS,
   COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
 } from "../workspaceTitlebar";
+import { HeroWidgets } from "../components/chat/heroWidgets/HeroWidgets";
 import { useComposerDraftStore } from "../composerDraftStore";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useScratchProject } from "../hooks/useScratchProject";
 import { useScrollingWorkspacesEnabled } from "../hooks/useSettings";
@@ -175,6 +177,7 @@ function NewTabLauncherBody({
   const handleNewThread = useNewThreadHandler();
   const { startScratchThread } = useScratchProject();
   const browserProfiles = useBrowserDefaults().profiles;
+  const isMobileViewport = useMediaQuery("max-sm");
   const focusedWorkspaceId = useLayoutStore((state) => state.layout.focusedWorkspaceId);
   const openLayoutPage = useOpenLayoutPage();
   const openPage = (kind: LayoutPageContent["kind"]) =>
@@ -273,37 +276,42 @@ function NewTabLauncherBody({
         PANE_BODY_UNDER_HEADER_CLASS,
       )}
     >
-      <div role="list" aria-label="New tab" className="flex w-full max-w-110 flex-col gap-0.5 py-6">
-        <DraftProjectGroupLabel>Start a thread in</DraftProjectGroupLabel>
-        <ProjectPickerRows
-          model={model}
-          groupLabels={false}
-          concise
-          selectedProjectKey={selectedProjectKey}
-          scratchSelected={scratchSelected}
-          onChooseEntry={chooseEntry}
-          onNoProject={startWithoutProject}
-        />
-        {contextThreadRef !== null && actions.some((action) => action.available) ? (
-          <>
-            <div aria-hidden className="h-2 shrink-0" />
-            <LauncherThreadLabel threadRef={contextThreadRef} projectId={contextProjectId} />
-            <SurfaceLauncherGrid
-              actions={actions}
-              pullRequest={pullRequest}
-              browserProfiles={browserProfiles}
-              onAddBrowserInProfile={(profileId) => openSurface("browser", profileId)}
-            />
-          </>
-        ) : null}
-        <div aria-hidden className="mx-2.5 my-1 h-px bg-border" />
-        <DraftProjectRow
-          icon={<PullRequestGlyph.pullRequest className="size-4 shrink-0 text-muted-foreground" />}
-          label="All pull requests"
-          detail=""
-          onSelect={() => openPage("pull-requests")}
-        />
-        <LayoutLearningTips />
+      <div className="relative w-full max-w-110 mb-(--hero-widgets-below)">
+        <div role="list" aria-label="New tab" className="flex w-full flex-col gap-0.5 py-6">
+          <DraftProjectGroupLabel>Start a thread in</DraftProjectGroupLabel>
+          <ProjectPickerRows
+            model={model}
+            groupLabels={false}
+            concise
+            selectedProjectKey={selectedProjectKey}
+            scratchSelected={scratchSelected}
+            onChooseEntry={chooseEntry}
+            onNoProject={startWithoutProject}
+          />
+          {contextThreadRef !== null && actions.some((action) => action.available) ? (
+            <>
+              <div aria-hidden className="h-2 shrink-0" />
+              <LauncherThreadLabel threadRef={contextThreadRef} projectId={contextProjectId} />
+              <SurfaceLauncherGrid
+                actions={actions}
+                pullRequest={pullRequest}
+                browserProfiles={browserProfiles}
+                onAddBrowserInProfile={(profileId) => openSurface("browser", profileId)}
+              />
+            </>
+          ) : null}
+          <div aria-hidden className="mx-2.5 my-1 h-px bg-border" />
+          <DraftProjectRow
+            icon={
+              <PullRequestGlyph.pullRequest className="size-4 shrink-0 text-muted-foreground" />
+            }
+            label="All pull requests"
+            detail=""
+            onSelect={() => openPage("pull-requests")}
+          />
+          <LayoutLearningTips />
+        </div>
+        {isMobileViewport ? null : <HeroWidgets />}
       </div>
     </div>
   );
