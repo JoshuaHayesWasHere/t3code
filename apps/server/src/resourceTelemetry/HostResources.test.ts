@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import type * as NodeOS from "node:os";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
@@ -52,42 +53,48 @@ const unlimitedCgroup = {
   [`${cgroup}/memory.stat`]: [`anon ${450 * MiB}\ninactive_file ${100 * MiB}\n`],
 };
 
-const historyPath = "/t3/userdata/host-cpu-history.json";
-
-// Each path serves its values in order and repeats the last one. Writes land in `written`.
-const linuxHost = (
-  files: Record<string, ReadonlyArray<string>>,
-  written = new Map<string, string>(),
-) => {
+// Each path serves its values in order and repeats the last one. When `baseDir` is given,
+// writes and reads under it hit the real filesystem so atomic saves run end to end.
+const linuxHost = (files: Record<string, ReadonlyArray<string>>, baseDir?: string) => {
   const reads = new Map<string, number>();
-  return HostResources.layer.pipe(
-    Layer.provide(ServerConfig.layerTest("/", "/t3")),
-    Layer.provide(
-      Layer.mergeAll(
-        Path.layer,
-        FileSystem.layerNoop({
+  const readVirtual = (path: string) => {
+    const values = files[path];
+    if (!values) {
+      return Effect.fail(
+        PlatformError.systemError({
+          _tag: "NotFound",
+          module: "FileSystem",
+          method: "readFileString",
+          pathOrDescriptor: path,
+        }),
+      );
+    }
+    const index = reads.get(path) ?? 0;
+    reads.set(path, index + 1);
+    return Effect.succeed(values[Math.min(index, values.length - 1)]!);
+  };
+  const fileSystemLayer =
+    baseDir === undefined
+      ? FileSystem.layerNoop({
           makeDirectory: () => Effect.void,
           makeTempDirectory: () => Effect.succeed("/tmp/t3-write"),
           remove: () => Effect.void,
-          writeFileString: (path, data) => Effect.sync(() => void written.set(path, data)),
-          rename: (from, to) => Effect.sync(() => void written.set(to, written.get(from) ?? "")),
-          readFileString: (path) => {
-            const values = files[path];
-            if (!values) {
-              return Effect.fail(
-                PlatformError.systemError({
-                  _tag: "NotFound",
-                  module: "FileSystem",
-                  method: "readFileString",
-                  pathOrDescriptor: path,
-                }),
-              );
-            }
-            const index = reads.get(path) ?? 0;
-            reads.set(path, index + 1);
-            return Effect.succeed(values[Math.min(index, values.length - 1)]!);
-          },
-        }),
+          readFileString: readVirtual,
+        })
+      : Layer.effect(
+          FileSystem.FileSystem,
+          Effect.map(FileSystem.FileSystem, (real) => ({
+            ...real,
+            readFileString: (path, encoding) =>
+              path.startsWith(baseDir) ? real.readFileString(path, encoding) : readVirtual(path),
+          })),
+        ).pipe(Layer.provide(NodeFileSystem.layer));
+  return HostResources.layer.pipe(
+    Layer.provide(ServerConfig.layerTest("/", baseDir ?? "/t3")),
+    Layer.provide(
+      Layer.mergeAll(
+        Path.layer,
+        fileSystemLayer,
         Layer.succeed(HostProcess.Platform, "linux"),
         Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
@@ -142,41 +149,34 @@ describe("HostResources.layer", () => {
     }).pipe(Effect.provide(linuxHost(unlimitedCgroup))),
   );
 
-  it.effect(
-    "resumes the saved history, with the downtime as a gap, and saves it on shutdown",
-    () => {
-      const written = new Map<string, string>();
-      return Effect.gen(function* () {
-        setup(0.5);
-        yield* Effect.scoped(
-          Effect.gen(function* () {
-            yield* TestClock.adjust("60 seconds");
-            const snapshot = yield* read;
+  it.effect("resumes the saved history, with the downtime as a gap, and saves it on shutdown", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-host-resources-" });
+      const historyPath = `${baseDir}/userdata/host-cpu-history.json`;
+      yield* fs.makeDirectory(`${baseDir}/userdata`, { recursive: true });
+      yield* fs.writeFileString(
+        historyPath,
+        JSON.stringify({ endAt: 0, intervalMs: 15_000, values: [0.2, 0.4] }),
+      );
 
-            // Saved at 0 ms; the tick at 30 s finds the one at 15 s missing.
-            assert.deepStrictEqual(snapshot.cpuHistory?.values, [0.2, 0.4, null, 0.5, 0.5, 0.5]);
-          }).pipe(
-            Effect.provide(
-              linuxHost(
-                {
-                  ...unlimitedCgroup,
-                  [historyPath]: [
-                    JSON.stringify({ endAt: 0, intervalMs: 15_000, values: [0.2, 0.4] }),
-                  ],
-                },
-                written,
-              ),
-            ),
-          ),
-        );
+      setup(0.5);
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("60 seconds");
+          const snapshot = yield* read;
 
-        assert.deepStrictEqual(JSON.parse(written.get(historyPath) ?? "null"), {
-          endAt: 60_000,
-          intervalMs: 15_000,
-          values: [0.2, 0.4, null, 0.5, 0.5, 0.5],
-        });
+          // Saved at 0 ms; the tick at 30 s finds the one at 15 s missing.
+          assert.deepStrictEqual(snapshot.cpuHistory?.values, [0.2, 0.4, null, 0.5, 0.5, 0.5]);
+        }).pipe(Effect.provide(linuxHost(unlimitedCgroup, baseDir))),
+      );
+
+      assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(historyPath)), {
+        endAt: 60_000,
+        intervalMs: 15_000,
+        values: [0.2, 0.4, null, 0.5, 0.5, 0.5],
       });
-    },
+    }).pipe(Effect.provide(NodeFileSystem.layer)),
   );
 
   it.effect("reports memory against the server cgroup's memory.max", () =>
