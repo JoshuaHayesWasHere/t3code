@@ -106,6 +106,7 @@ import {
 } from "./layoutActions";
 import { beginLayoutContentDrag, beginLayoutTabDrag } from "./layoutDrag";
 import { useLayoutPane } from "./layoutPaneContext";
+import { followLayoutCompanions } from "./openRules";
 import { isScrollingWorkspacesEnabled } from "./layoutBehavior";
 import { useLayoutStore } from "./layoutStore";
 import { scrollTabStripFromRow, setWheelScroller, wheelDeltaPx } from "../motion/gesture";
@@ -122,6 +123,7 @@ import {
 import {
   paneStripThreadKeys,
   paneStripThreadStateOf,
+  sidebarWorkingThreadsAtom,
   paneStripThreadStatesAtom,
 } from "./paneStripThreadStates";
 import { requestTabGroupEditor, TAB_GROUP_COLOR_LABEL, TAB_GROUP_TONE } from "./TabGroupEditor";
@@ -771,6 +773,7 @@ export function usePaneSiblingTabs(
   const hideSettled = useClientSettings((settings) => settings.paneTabsFollowInbox);
   const threadKeys = (workingGroup || hideSettled) && pane ? paneStripThreadKeys(pane) : [];
   const threadStates = useAtomValue(paneStripThreadStatesAtom(threadKeys));
+  const workingThreads = useAtomValue(sidebarWorkingThreadsAtom);
   if (!pane || tabId === null || !pane.tabs.some((tab) => tab.id === tabId)) {
     return NO_SIBLING_TABS;
   }
@@ -781,6 +784,7 @@ export function usePaneSiblingTabs(
       groups: paneStripGroups(pane, workingGroup, resolve),
       threadStateOf: paneStripThreadStateOf(threadKeys, threadStates),
       hideSettled,
+      workingThreads,
     }),
     tabId,
   );
@@ -791,7 +795,14 @@ export function usePaneSiblingTabs(
 
 export function PaneStripItems({ items }: { items: readonly PaneStripItem[] }) {
   return items.map((item) =>
-    item.kind === "tab" ? (
+    item.kind === "tab" && item.tab.unopened ? (
+      <UnopenedWorkingPaneTab
+        key={item.tab.id}
+        tab={item.tab}
+        color={item.group?.color ?? null}
+        groupId={item.group?.id ?? null}
+      />
+    ) : item.kind === "tab" ? (
       <LayoutPaneTab
         key={item.tab.id}
         tab={item.tab}
@@ -1453,6 +1464,49 @@ function ThreadLayoutPaneTab({
       onOpenMenu={openMenu}
       status={dot === null || dot === "working" ? null : NEEDS_YOU_DOT[dot]}
     />
+  );
+}
+
+/**
+ * A working thread the pane has no tab for, drawn so Working lists what the sidebar's shelf
+ * does. A click opens it in this pane. It has no close: Working lists it while it works.
+ */
+function UnopenedWorkingPaneTab({ tab, color, groupId }: { tab: LayoutTab } & PaneTabGroupProps) {
+  const { paneId } = useLayoutPane();
+  const label = useLayoutTabLabel(tab);
+  const open = () => {
+    const store = useLayoutStore.getState();
+    followLayoutCompanions(() =>
+      paneId === null
+        ? store.openTab(tab.content)
+        : store.placeContent(tab.content, { kind: "pane", paneId }),
+    );
+  };
+  return (
+    <span className={LAYOUT_TAB_SLOT_CLASS}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <ContentButton
+              variant="tab"
+              type="button"
+              data-layout-pane-tab={tab.id}
+              data-tab-group={groupId ?? undefined}
+              onClick={open}
+            />
+          }
+        >
+          <span className={LAYOUT_TAB_ICON_CLASS}>{label.icon}</span>
+          <span className={PANE_INACTIVE_TAB_TITLE_CLASS} dir={textDirection(label.title)}>
+            {label.title}
+          </span>
+        </TooltipTrigger>
+        <TooltipPopup side="bottom" className="whitespace-pre-line">
+          {label.tooltip}
+        </TooltipPopup>
+      </Tooltip>
+      <PaneTabGroupLine color={color} />
+    </span>
   );
 }
 

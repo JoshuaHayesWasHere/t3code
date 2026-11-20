@@ -34,6 +34,7 @@ import {
   paneStripThreadKeys,
   paneStripThreadStateOf,
   paneStripThreadStatesAtom,
+  sidebarWorkingThreadsAtom,
 } from "./paneStripThreadStates";
 import type { LauncherSurfaceKind } from "../components/SurfaceLauncher";
 import type { ScopedProjectRef, ScopedThreadRef } from "@t3tools/contracts";
@@ -54,6 +55,7 @@ function readDrawnPaneTabIds(pane: LayoutPane): string[] {
         appAtomRegistry.get(paneStripThreadStatesAtom(keys)),
       ),
       hideSettled: settings.paneTabsFollowInbox,
+      workingThreads: appAtomRegistry.get(sidebarWorkingThreadsAtom),
     }),
   );
 }

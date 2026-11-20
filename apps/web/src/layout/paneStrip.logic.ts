@@ -1,3 +1,4 @@
+import { threadKey } from "@t3tools/client-runtime/state/entities";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { isThreadWorking } from "@t3tools/client-runtime/state/thread-inbox";
 import {
@@ -85,21 +86,32 @@ export function paneStripGroups(
   return groups;
 }
 
+/** A drawn tab. `unopened` marks a working thread the pane has no tab for yet. */
+export type PaneStripTab = LayoutTab & { readonly unopened?: true };
+
 export type PaneStripSegment =
   | { readonly kind: "tab"; readonly tab: LayoutTab }
   | {
       readonly kind: "group";
       readonly group: PaneTabGroupDefinition;
       /** The members drawn: all of them, or while collapsed only the pane's shown tab. */
-      readonly tabs: readonly LayoutTab[];
+      readonly tabs: readonly PaneStripTab[];
       /** Every member the strip draws while the group is open. */
       readonly count: number;
     };
 
+function unopenedWorkingTab(threadRef: ScopedThreadRef): PaneStripTab {
+  return {
+    id: `working:${threadRef.environmentId}/${threadRef.threadId}`,
+    content: { kind: "chat", target: { kind: "server", threadRef } },
+    unopened: true,
+  };
+}
+
 /**
- * A pane's tab strip in drawing order. A tab joins its stored group, else a rule group its
- * thread matches. Settled chats leave the strip when `hideSettled`. The shown tab is always
- * drawn, also inside a collapsed group.
+ * A pane's tab strip in drawing order. A working chat joins the Working group, else a tab
+ * joins its stored group. Settled chats leave the strip when `hideSettled`. The shown tab is
+ * always drawn, also inside a collapsed group.
  */
 export function arrangePaneStrip(input: {
   readonly tabs: readonly LayoutTab[];
@@ -107,24 +119,39 @@ export function arrangePaneStrip(input: {
   readonly groups: readonly PaneTabGroupDefinition[];
   readonly threadStateOf: (ref: ScopedThreadRef) => PaneStripThreadState | null;
   readonly hideSettled: boolean;
+  /** The sidebar's Working shelf: when given, Working draws exactly it, in its order. */
+  readonly workingThreads?: readonly ScopedThreadRef[] | null;
 }): PaneStripSegment[] {
   const stored = new Map(
     input.groups.flatMap((group) => (group.rule === null ? [[group.id, group] as const] : [])),
   );
   const rules = input.groups.filter((group) => group.rule !== null);
-  const members = new Map<string, LayoutTab[]>();
+  const workingRule = rules.find((rule) => rule.rule === "working");
+  const workingThreads = input.workingThreads ?? null;
+  const workingRank =
+    workingThreads === null
+      ? null
+      : new Map(workingThreads.map((ref, index) => [threadKey(ref), index]));
+  const stateOf = (ref: ScopedThreadRef): PaneStripThreadState | null => {
+    const state = input.threadStateOf(ref);
+    if (workingRank === null) return state;
+    if (workingRank.has(threadKey(ref))) return "working";
+    return state === "working" ? "inbox" : state;
+  };
+  const members = new Map<string, PaneStripTab[]>();
   const order: Array<
     | { readonly kind: "tab"; readonly tab: LayoutTab }
     | { readonly kind: "group"; readonly group: PaneTabGroupDefinition }
   > = [];
+  const openWorking = new Set<string>();
   for (const tab of input.tabs) {
     const shown = tab.id === input.activeTabId;
     const ref = paneStripThreadRef(tab);
-    const state = ref === null ? null : input.threadStateOf(ref);
+    const state = ref === null ? null : stateOf(ref);
     if (!shown && input.hideSettled && state === "settled") continue;
-    const group =
-      (tab.groupId === undefined ? undefined : stored.get(tab.groupId)) ??
-      rules.find((rule) => rule.rule === state);
+    const ruled = rules.find((rule) => rule.rule === state);
+    if (ruled && ref !== null) openWorking.add(threadKey(ref));
+    const group = ruled ?? (tab.groupId === undefined ? undefined : stored.get(tab.groupId));
     if (!group) {
       order.push({ kind: "tab", tab });
       continue;
@@ -136,6 +163,19 @@ export function arrangePaneStrip(input: {
     }
     members.set(group.id, [tab]);
     if (group.rule === null) order.push({ kind: "group", group });
+  }
+  if (workingRule && workingThreads !== null && workingRank !== null) {
+    const unopened = workingThreads
+      .filter((ref) => !openWorking.has(threadKey(ref)))
+      .map(unopenedWorkingTab);
+    const rank = (tab: PaneStripTab) => {
+      const ref = paneStripThreadRef(tab);
+      return ref === null ? -1 : (workingRank.get(threadKey(ref)) ?? -1);
+    };
+    const all = [...(members.get(workingRule.id) ?? []), ...unopened].toSorted(
+      (left, right) => rank(left) - rank(right),
+    );
+    if (all.length > 0) members.set(workingRule.id, all);
   }
   const ruled = rules.flatMap((rule) =>
     members.has(rule.id) ? [{ kind: "group" as const, group: rule }] : [],
@@ -156,14 +196,16 @@ export function arrangePaneStrip(input: {
 /** The tabs a strip draws, in order: what ctrl+Tab steps through and a close falls back to. */
 export function drawnPaneTabIds(segments: readonly PaneStripSegment[]): string[] {
   return segments.flatMap((segment) =>
-    segment.kind === "tab" ? [segment.tab.id] : segment.tabs.map((tab) => tab.id),
+    segment.kind === "tab"
+      ? [segment.tab.id]
+      : segment.tabs.flatMap((tab) => (tab.unopened ? [] : [tab.id])),
   );
 }
 
 export type PaneStripItem =
   | {
       readonly kind: "tab";
-      readonly tab: LayoutTab;
+      readonly tab: PaneStripTab;
       readonly group: PaneTabGroupDefinition | null;
     }
   | { readonly kind: "chip"; readonly group: PaneTabGroupDefinition; readonly count: number };
@@ -186,7 +228,7 @@ export function splitPaneStrip(
   let passedActive = false;
   let activeColor: LayoutTabGroupColor | null = null;
   let activeGroupId: string | null = null;
-  const place = (tab: LayoutTab, group: PaneTabGroupDefinition | null) => {
+  const place = (tab: PaneStripTab, group: PaneTabGroupDefinition | null) => {
     if (tab.id !== activeTabId) {
       (passedActive ? after : before).push({ kind: "tab", tab, group });
       return;

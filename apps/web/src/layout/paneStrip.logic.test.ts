@@ -162,6 +162,7 @@ describe("arrangePaneStrip", () => {
     active: string;
     groups?: readonly PaneTabGroupDefinition[];
     hideSettled?: boolean;
+    working?: readonly string[];
     expected: string[];
   }>([
     {
@@ -228,11 +229,35 @@ describe("arrangePaneStrip", () => {
       expected: ["i", "g(2)[i2 w]", "s"],
     },
     {
-      case: "a working chat in a stored group stays there",
+      case: "a working chat in a stored group draws in Working while it works",
       tabs: ["i", "w@g", "w2"].map(chatTab),
       active: "i",
       groups: [group("g"), workingTabGroup(false)],
-      expected: ["Working(1)[w2]", "i", "g(1)[w]"],
+      expected: ["Working(2)[w w2]", "i"],
+    },
+    {
+      case: "the sidebar's shelf decides Working, in its order, adding threads the pane lacks",
+      tabs: ["w", "i", "w2"].map(chatTab),
+      active: "i",
+      groups: [workingTabGroup(false)],
+      working: ["x", "w2", "i"],
+      expected: ["Working(3)[working:local/x w2 i]", "w"],
+    },
+    {
+      case: "a collapsed Working group counts the threads the pane lacks",
+      tabs: ["i"].map(chatTab),
+      active: "i",
+      groups: [workingTabGroup(true)],
+      working: ["x", "y"],
+      expected: ["Working(2)[]", "i"],
+    },
+    {
+      case: "an empty shelf leaves no Working group",
+      tabs: ["w", "i"].map(chatTab),
+      active: "i",
+      groups: [workingTabGroup(false)],
+      working: [],
+      expected: ["w", "i"],
     },
     {
       case: "a collapsed group draws only its chip",
@@ -270,7 +295,7 @@ describe("arrangePaneStrip", () => {
       active: "i",
       expected: ["i", "i2"],
     },
-  ])("$case", ({ tabs, active, groups = [], hideSettled = false, expected }) => {
+  ])("$case", ({ tabs, active, groups = [], hideSettled = false, working, expected }) => {
     expect(
       drawn(
         arrangePaneStrip({
@@ -279,6 +304,8 @@ describe("arrangePaneStrip", () => {
           groups,
           threadStateOf: (ref) => states[ref.threadId] ?? null,
           hideSettled,
+          workingThreads:
+            working?.map((id) => scopeThreadRef(environmentId, ThreadId.make(id))) ?? null,
         }),
       ),
     ).toEqual(expected);
@@ -333,6 +360,18 @@ describe("drawnPaneTabIds", () => {
       hideSettled: false,
     });
     expect(drawnPaneTabIds(segments)).toEqual(["w", "w2", "i"]);
+  });
+
+  it("skips Working's threads the pane has no tab for", () => {
+    const segments = arrangePaneStrip({
+      tabs: ["w", "i"].map(chatTab),
+      activeTabId: "i",
+      groups: [workingTabGroup(false)],
+      threadStateOf: () => "inbox",
+      hideSettled: false,
+      workingThreads: ["x", "w"].map((id) => scopeThreadRef(environmentId, ThreadId.make(id))),
+    });
+    expect(drawnPaneTabIds(segments)).toEqual(["w", "i"]);
   });
 });
 
