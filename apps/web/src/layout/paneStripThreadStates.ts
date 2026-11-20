@@ -7,6 +7,7 @@ import {
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentThreadShells } from "../state/threads";
 import type { LayoutPane } from "./layoutModel";
 import {
@@ -57,4 +58,21 @@ export function paneStripThreadStateOf(
 ): (ref: ScopedThreadRef) => PaneStripThreadState | null {
   const byKey = new Map(keys.map((key, index) => [key, states[index] ?? null]));
   return (ref) => byKey.get(threadKey(ref)) ?? null;
+}
+
+/**
+ * The sidebar's Working shelf, in its order, or null when the sidebar has no shelf. Each
+ * pane's Working group draws exactly these threads.
+ */
+export const sidebarWorkingThreadsAtom = Atom.make<ReadonlyArray<ScopedThreadRef> | null>(
+  null,
+).pipe(Atom.keepAlive, Atom.withLabel("sidebar-working-threads"));
+
+export function publishSidebarWorkingThreads(refs: ReadonlyArray<ScopedThreadRef> | null): void {
+  const current = appAtomRegistry.get(sidebarWorkingThreadsAtom);
+  const same =
+    current === null || refs === null
+      ? current === refs
+      : arrayElementsEqual(current.map(threadKey), refs.map(threadKey));
+  if (!same) appAtomRegistry.set(sidebarWorkingThreadsAtom, refs);
 }

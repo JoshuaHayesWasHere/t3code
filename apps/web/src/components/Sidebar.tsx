@@ -18,6 +18,7 @@ import {
   selectLayoutThreadKeys,
 } from "../layout/layoutModel";
 import { followLayoutCompanions } from "../layout/openRules";
+import { publishSidebarWorkingThreads } from "../layout/paneStripThreadStates";
 import { isThreadlessSurfacesRef } from "../threadlessSurfaces";
 import { useLayoutStore } from "../layout/layoutStore";
 import {
@@ -1506,6 +1507,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
     layoutThreadKeys,
   });
+  const workingShelfSignature = workingShelfEnabled
+    ? workingThreads.map(threadShellKey).join("\n")
+    : null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the Working shelf to the pane strips' atom, which draw the same threads in their Working group
+  useEffect(() => {
+    publishSidebarWorkingThreads(
+      workingShelfSignature === null
+        ? null
+        : workingShelfSignature.split("\n").flatMap((key) => parseScopedThreadKey(key) ?? []),
+    );
+  }, [workingShelfSignature]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a sidebar that unmounts stops speaking for the pane strips
+  useEffect(() => () => publishSidebarWorkingThreads(null), []);
 
   // Ranked across environments as the palette ranks them, so one
   // environment's list does not sit above another's better matches; rows
