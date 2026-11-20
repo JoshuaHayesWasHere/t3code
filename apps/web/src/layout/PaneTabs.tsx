@@ -115,6 +115,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { surfaceTabTitle, terminalTabTitle } from "./surfaceTabLabels";
 import {
   arrangePaneStrip,
+  paneStripThreadRef,
   splitPaneStrip,
   paneStripGroups,
   type PaneStripItem,
@@ -777,14 +778,23 @@ export function usePaneSiblingTabs(
   if (!pane || tabId === null || !pane.tabs.some((tab) => tab.id === tabId)) {
     return NO_SIBLING_TABS;
   }
+  const omitted = pane.tabs.find((tab) => tab.id === omitTabId);
+  const omittedThreadRef = omitted === undefined ? null : paneStripThreadRef(omitted);
   const split = splitPaneStrip(
     arrangePaneStrip({
-      tabs: omitTabId === undefined ? pane.tabs : pane.tabs.filter((tab) => tab.id !== omitTabId),
+      tabs: omitted === undefined ? pane.tabs : pane.tabs.filter((tab) => tab !== omitted),
       activeTabId: tabId,
       groups: paneStripGroups(pane, workingGroup, resolve),
       threadStateOf: paneStripThreadStateOf(threadKeys, threadStates),
       hideSettled,
-      workingThreads,
+      workingThreads:
+        omittedThreadRef === null
+          ? workingThreads
+          : (workingThreads?.filter(
+              (ref) =>
+                ref.environmentId !== omittedThreadRef.environmentId ||
+                ref.threadId !== omittedThreadRef.threadId,
+            ) ?? null),
     }),
     tabId,
   );
@@ -1496,7 +1506,7 @@ function UnopenedWorkingPaneTab({ tab, color, groupId }: { tab: LayoutTab } & Pa
             />
           }
         >
-          <span className={LAYOUT_TAB_ICON_CLASS}>{label.icon}</span>
+          {label.icon}
           <span className={PANE_INACTIVE_TAB_TITLE_CLASS} dir={textDirection(label.title)}>
             {label.title}
           </span>
